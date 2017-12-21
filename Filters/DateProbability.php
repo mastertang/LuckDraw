@@ -20,22 +20,39 @@ class DateProbability
         if (!empty($probabilityChange) && is_array($probabilityChange)) {
             $ymd = $drawKernel->getYmd();
             $nowStamp = $drawKernel->getNowStamp();
+            $nowProbability = [];
             if (isset($probabilityChange[$ymd])) {
                 $nowProbability = $probabilityChange[$ymd];
-                foreach ($nowProbability as $section) {
-                    if (is_array($section) &&
-                        isset($section[0]) &&
-                        isset($section[1]) &&
-                        isset($section[0][0]) &&
-                        isset($section[0][1]) &&
-                        (is_int($section[1]) || is_float($section[1]) || is_double($section[1]))
-                    ) {
-                        $start = strtotime($ymd . ' ' . $section[0][0]);
-                        $end = strtotime($ymd . ' ' . $section[0][1]);
-                        if ($nowStamp <= $end && $nowStamp >= $start) {
-                            $drawKernel->setProbability($section[1]);
-                            break;
+            } else {
+                foreach ($probabilityChange as $time => $probabity) {
+                    if (strpos($time, "|") !== false) {
+                        $timeSection = explode("|", $time);
+                        if (sizeof($timeSection) == 2) {
+                            $startDate = strtotime($timeSection[0] . " 00:00:01");
+                            $endDate = strtotime($timeSection[1] . " 23:59:59");
+                            if ($startDate !== false && $endDate !== false && $endDate > $startDate) {
+                                if ($nowStamp <= $endDate && $nowStamp >= $startDate) {
+                                    $nowProbability = $probabity;
+                                }
+                            }
                         }
+                    }
+                }
+            }
+            foreach ($nowProbability as $section) {
+                if (is_array($section) &&
+                    isset($section[0]) &&
+                    isset($section[1]) &&
+                    isset($section[0][0]) &&
+                    isset($section[0][1]) &&
+                    !is_string($section[1]) &&
+                    is_numeric($section[1])
+                ) {
+                    $start = strtotime($ymd . ' ' . $section[0][0]);
+                    $end = strtotime($ymd . ' ' . $section[0][1]);
+                    if ($nowStamp <= $end && $nowStamp >= $start) {
+                        $drawKernel->setProbability($section[1]);
+                        break;
                     }
                 }
             }

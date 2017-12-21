@@ -10,7 +10,7 @@ class PrizeAllOut
     /**
      * 过滤器默认方法-检查每个人可中奖数量
      * $limit => 奖品总数
-     * $countHandler => callable| 10 可以为callable参数返回当前所有已中的键盘数量，或直接给总数int
+     * $countHandler => callable| 10 可以为callable参数返回当前所有已中的奖品数量，或直接给总数int
      */
     public function filter(DrawKernel $drawKernel, $limit, $countHandler)
     {
@@ -27,8 +27,6 @@ class PrizeAllOut
                     throw new FilterParamsErrorException();
                 }
             }
-            var_dump($count);
-            var_dump($limit);
             if ($count >= $limit) {
                 throw new NotWinPrizeException();
             }

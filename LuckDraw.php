@@ -67,6 +67,9 @@ class LuckDraw
             call_user_func_array($callAble, $params);
         }
         $prizeSection = $luckDraw->getPrizeProbabilitySection();
+        if(empty($prizeSection)){
+            throw new NotWinPrizeException();
+        }
         $maxNumber = end($prizeSection);
         $maxNumber = $maxNumber[1];
         $rand = rand(1, $maxNumber);

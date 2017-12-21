@@ -2,9 +2,7 @@
 namespace LuckDraw\Filters;
 
 use LuckDraw\DrawKernel;
-use LuckDraw\Exceptions\FilterParamsErrorException;
 use LuckDraw\Exceptions\NotWinPrizeException;
-use LuckDraw\Exceptions\TimeSectionDrawRefuseException;
 
 class WinIf
 {
@@ -17,7 +15,7 @@ class WinIf
     {
         if ($drawKernel->getProbability() == 0) {
             throw new NotWinPrizeException();
-        } else {
+        } elseif ($drawKernel->getProbability() != 100) {
             $rand = rand(1, $drawKernel->getMaxProbability());
             if ($rand > $drawKernel->getProbability()) {
                 throw new NotWinPrizeException();

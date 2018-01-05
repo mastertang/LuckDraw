@@ -16,7 +16,8 @@ $end = '2017-10-09 23:10:10';
 
 $prize = (new \LuckDraw\LuckDraw())
     ->addFilter(\LuckDraw\Filters\EveryPrizeLimit::class,
-        [[1 => 2, 2 => 3, 3 => 2], [1 => 1, 2 => 1, 3 => 1]])
+        [[1 => 2, 2 => 3, 3 => 2],
+            [1 => 1, 2 => 1, 3 => 1]])
     ->addFilter(\LuckDraw\Filters\WinIf::class)
     ->lottery((new \LuckDraw\DrawKernel())
         ->setProbability(30)

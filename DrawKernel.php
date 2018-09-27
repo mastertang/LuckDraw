@@ -1,4 +1,5 @@
 <?php
+
 namespace LuckDraw;
 class DrawKernel
 {
@@ -22,6 +23,16 @@ class DrawKernel
      */
     protected $prizeProbbilitySection = [];
 
+    /*
+     * 奖品最高概率
+     */
+    protected $prizeMaxProbaility = 0;
+
+    /*
+     * 安慰奖id
+     */
+    protected $consolationPrizeId = null;
+
     /**
      * 当前时间戳
      */
@@ -32,10 +43,35 @@ class DrawKernel
      */
     protected $ymd = '';
 
+    /*
+     * 构造函数
+     */
     public function __construct()
     {
         $this->nowStamp = time();
-        $this->ymd = date('Y-m-d', $this->nowStamp);
+        $this->ymd      = date('Y-m-d', $this->nowStamp);
+    }
+
+    /*
+     * 设置安慰奖id
+     */
+    public function setConsolationPrizeId($prizeId)
+    {
+        if (is_numeric($prizeId)) {
+            $prizeId = (int)$prizeId;
+            if ($prizeId >= 0) {
+                $this->consolationPrizeId = $prizeId;
+            }
+        }
+        return $this;
+    }
+
+    /*
+     * 获取安慰奖id
+     */
+    public function getConsolationPrizeId()
+    {
+        return $this->consolationPrizeId;
     }
 
     /**
@@ -92,15 +128,11 @@ class DrawKernel
      */
     public function setProbability($probability)
     {
-        if (!is_string($probability) && is_numeric($probability)) {
-            if ($probability >= 100) {
-                $this->probability = 100;
-            } elseif ($probability <= 0) {
-                $this->probability = 0;
-            } else {
-                $this->probability = $probability;
-            }
+        if (is_numeric($probability)) {
+            $this->probability = $probability <= 0 ? 0 : ($probability >= 100 ? 100 : $probability);
             $this->handleProbability();
+        } else {
+            $this->probability = 0;
         }
         return $this;
     }
@@ -110,17 +142,18 @@ class DrawKernel
      */
     private function handleProbability()
     {
-        if (in_array($this->probability, [100, 0])) {
+        if ($this->probability == 0) {
             $this->maxProbability = $this->probability;
         } else {
             $numberArray = explode('.', $this->probability);
-            $integer = $numberArray[0];
-            $decimal = $numberArray[1];
+            $integer     = isset($numberArray[0]) ? $numberArray[0] : 0;
+            $decimal     = isset($numberArray[1]) ? $numberArray[1] : 0;
             if ((int)$decimal == 0) {
-                $this->probability = $this->maxProbability = (int)$integer;
+                $this->probability    = (int)$integer;
+                $this->maxProbability = 100;
             } else {
-                $decimalLength = strlen($decimal);
-                $this->probability = (int)($this->probability * pow(10, $decimalLength));
+                $decimalLength        = strlen($decimal);
+                $this->probability    = (int)($this->probability * pow(10, $decimalLength));
                 $this->maxProbability = pow(10, strlen($integer) + $decimalLength);
             }
         }
@@ -132,31 +165,34 @@ class DrawKernel
     public function setPrizeProbability($prizeProbability)
     {
         if (is_array($prizeProbability) && !empty($prizeProbability)) {
-            if (array_sum($prizeProbability) == 100) {
-                $keys = array_keys($prizeProbability);
-                $keysSize = sizeof($keys);
-                $correct = true;
-                for ($i = 0; $i < $keysSize; $i++) {
-                    if (is_string($keys[$i]) || !is_int($keys[$i]) || $keys[$i] < 0) {
-                        $correct = false;
-                        break;
-                    }
-                    if (($keys[$i] + 1) != $keys[$i + 1]) {
-                        $correct = false;
-                    }
+            ksort($prizeProbability);
+            if (isset($prizeProbability[0])) {
+                $tempProbability = [];
+                foreach ($prizeProbability as $prizeId => $probability) {
+                    $tempProbability[$prizeId + 1] = $probability;
                 }
-                if ($correct) {
-                    if ($keys[0] == 0) {
-                        $newProbability = [];
-                        foreach ($prizeProbability as $key => $probability) {
-                            $newProbability[$key + 1] = $probability;
-                        }
-                        $prizeProbability = $newProbability;
-                    }
-                    $this->prizeProbability = $prizeProbability;
-                    $this->createPrizeProbabilitySection();
+                $prizeProbability = $tempProbability;
+                unset($tempProbability);
+            }
+            $prizeProbability = array_combine(range(1, sizeof($prizeProbability)), array_values($prizeProbability));
+
+            $longerDecimalLength = 0;
+            foreach ($prizeProbability as $probability) {
+                $numberArray = explode('.', $probability);
+                $decimal     = (int)(isset($numberArray[1]) ? $numberArray[1] : 0);
+                if ($decimal != 0 && strlen($decimal) > $longerDecimalLength) {
+                    $longerDecimalLength = strlen($decimal);
                 }
             }
+            $product = pow(10, $longerDecimalLength);
+            foreach ($prizeProbability as $prizeId => $probability) {
+                $prizeProbability[$prizeId] = (int)($probability * $product);
+            }
+            $this->prizeProbability = $prizeProbability;
+            $this->createPrizeProbabilitySection();
+        } else {
+            $this->prizeProbability = [];
+            $this->createPrizeProbabilitySection();
         }
         return $this;
     }
@@ -169,31 +205,13 @@ class DrawKernel
         if (empty($this->prizeProbability)) {
             $this->prizeProbbilitySection = [];
         } else {
-            $maxLength = 0;
-            foreach ($this->prizeProbability as $prize => $probability) {
-                $tempExplore = explode('.', $probability);
-                $tempLength = isset($tempExplore[1]) ? strlen($tempExplore[1]) : 0;
-                if ($tempLength >= $maxLength) {
-                    $maxLength = $tempLength;
-                }
+            $section = [];
+            foreach ($this->prizeProbability as $prizeId => $probabiltiy) {
+                $section[$prizeId] = $probabiltiy + $this->prizeProbability[$prizeId - 1];
             }
-            $number = pow(10, $maxLength);
-            foreach ($this->prizeProbability as $prize => $probability) {
-                $this->prizeProbability[$prize] = $probability * $number;
-            }
-            $start = 0;
-            $this->prizeProbbilitySection = [];
-            foreach ($this->prizeProbability as $prize => $probability) {
-                if($probability != 0){
-                    if ($start == 0) {
-                        $this->prizeProbbilitySection[$prize] = [$start + 1, $probability];
-                        $start = $probability;
-                    } else {
-                        $this->prizeProbbilitySection[$prize] = [$start + 1, $probability + $start];
-                        $start += $probability;
-                    }
-                }
-            }
+            $this->prizeProbbilitySection = $section;
+            $this->prizeMaxProbaility = end($section);
         }
+        return $this;
     }
 }

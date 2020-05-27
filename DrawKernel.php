@@ -1,38 +1,13 @@
 <?php
 
 namespace LuckDraw;
+
+/**
+ * Class DrawKernel
+ * @package LuckDraw
+ */
 class DrawKernel
 {
-    /**
-     * 中奖概率
-     */
-    protected $probability = 0;
-
-    /**
-     * 中奖概率最高值
-     */
-    protected $maxProbability = 0;
-
-    /**
-     * 奖品概率
-     */
-    protected $prizeProbability = [];
-
-    /**
-     * 奖品概率区间
-     */
-    protected $prizeProbbilitySection = [];
-
-    /*
-     * 奖品最高概率
-     */
-    protected $prizeMaxProbaility = 0;
-
-    /*
-     * 安慰奖id
-     */
-    protected $consolationPrizeId = null;
-
     /**
      * 当前时间戳
      */
@@ -52,28 +27,6 @@ class DrawKernel
         $this->ymd      = date('Y-m-d', $this->nowStamp);
     }
 
-    /*
-     * 设置安慰奖id
-     */
-    public function setConsolationPrizeId($prizeId)
-    {
-        if (is_numeric($prizeId)) {
-            $prizeId = (int)$prizeId;
-            if ($prizeId >= 0) {
-                $this->consolationPrizeId = $prizeId;
-            }
-        }
-        return $this;
-    }
-
-    /*
-     * 获取安慰奖id
-     */
-    public function getConsolationPrizeId()
-    {
-        return $this->consolationPrizeId;
-    }
-
     /**
      * 获取当前时间戳
      */
@@ -91,127 +44,296 @@ class DrawKernel
     }
 
     /**
-     * 获取奖品概率
+     * 是否在活动出奖日期内
+     *
+     * @param $activityDateList
+     * @return bool
+     * @throws \Exception
      */
-    public function getPrizeProbability()
+    public function isInActivityDate($activityDateList)
     {
-        return $this->prizeProbability;
-    }
-
-    /**
-     * 获取当前奖品概率区间
-     */
-    public function getPrizeProbabilitySection()
-    {
-        return $this->prizeProbbilitySection;
-    }
-
-    /**
-     * 获取最高中奖概率
-     */
-    public function getMaxProbability()
-    {
-        return $this->maxProbability;
-    }
-
-    /**
-     * 获取中奖概率
-     */
-    public function getProbability()
-    {
-        return $this->probability;
-    }
-
-
-    /**
-     * 设置中奖概率
-     */
-    public function setProbability($probability)
-    {
-        if (is_numeric($probability)) {
-            $this->probability = $probability <= 0 ? 0 : ($probability >= 100 ? 100 : $probability);
-            $this->handleProbability();
-        } else {
-            $this->probability = 0;
+        if (empty($activityDateList)) {
+            return true;
         }
-        return $this;
+        foreach ($activityDateList as $activityDate) {
+            if ($this->nowStamp >= $activityDate[0] && $this->nowStamp <= $activityDate[1]) {
+                return true;
+            }
+        }
+        throw new \Exception("Not in ActivityDate");
     }
 
     /**
-     * 处理Raw 中奖概率
+     * 是否在每日活动时间段
+     *
+     * @param $dateTimeList
+     * @return bool
+     * @throws \Exception
      */
-    private function handleProbability()
+    public function isInDateTime($dateTimeList)
     {
-        if ($this->probability == 0) {
-            $this->maxProbability = $this->probability;
-        } else {
-            $numberArray = explode('.', $this->probability);
-            $integer     = isset($numberArray[0]) ? $numberArray[0] : 0;
-            $decimal     = isset($numberArray[1]) ? $numberArray[1] : 0;
-            if ((int)$decimal == 0) {
-                $this->probability    = (int)$integer;
-                $this->maxProbability = 100;
+        if (empty($dateTimeList)) {
+            return true;
+        }
+        foreach ($dateTimeList as $dateTime) {
+            if ($this->nowStamp >= $dateTime[0] && $this->nowStamp <= $dateTime[1]) {
+                return true;
+            }
+        }
+        throw new \Exception("Not in dateTime");
+    }
+
+    /**
+     * 查找日期设定的统一概率
+     *
+     * @param $dateProbabilityList
+     * @return bool|null
+     */
+    public function findDateProbability($dateProbabilityList)
+    {
+        if (empty($dateProbabilityList)) {
+            return false;
+        }
+        $inDateProbability = null;
+        $timeSection       = 0;
+        foreach ($dateProbabilityList as $dateProbability) {
+            if ($this->nowStamp >= $dateProbability[0]
+                && $this->nowStamp <= $dateProbability[1]) {
+                $tempTimeSection = $dateProbability[1] - $dateProbability[0];
+                if ($timeSection === 0 || $tempTimeSection <= $timeSection) {
+                    $timeSection       = $tempTimeSection;
+                    $inDateProbability = $dateProbability;
+                }
+            }
+        }
+        if ($inDateProbability === null) {
+            return false;
+        }
+        return $inDateProbability[2];
+    }
+
+    /**
+     * 是否超过总奖品数量限制
+     *
+     * @param $totalCount
+     * @param $totalPrizeCountFunction
+     * @return bool
+     */
+    public function isInAllPirzeCountLimit($totalCount, $totalPrizeCountFunction)
+    {
+        if (is_callable($totalPrizeCountFunction) && is_numeric($totalCount) && $totalCount >= 0) {
+            $nowCount = call_user_func_array($totalPrizeCountFunction, []);
+            if (!is_numeric($nowCount)) {
+                return false;
             } else {
-                $decimalLength        = strlen($decimal);
-                $this->probability    = (int)($this->probability * pow(10, $decimalLength));
-                $this->maxProbability = pow(10, strlen($integer) + $decimalLength);
+                return $totalCount > $nowCount ? false : true;
             }
+        }
+        return true;
+    }
+
+    /**
+     * 是否中奖
+     *
+     * @param $totalProbability
+     * @return bool
+     */
+    public function isInTotalProbability($totalProbability)
+    {
+        $rand = rand(1, 100);
+        if ($rand <= $totalProbability) {
+            return true;
+        } else {
+            return false;
         }
     }
 
     /**
-     * 设置奖品概率
+     * 开始奖品过滤
+     *
+     * @param $prizeList
+     * @return array
      */
-    public function setPrizeProbability($prizeProbability)
+    public function prizesFilteStart($prizeList)
     {
-        if (is_array($prizeProbability) && !empty($prizeProbability)) {
-            ksort($prizeProbability);
-            if (isset($prizeProbability[0])) {
-                $tempProbability = [];
-                foreach ($prizeProbability as $prizeId => $probability) {
-                    $tempProbability[$prizeId + 1] = $probability;
-                }
-                $prizeProbability = $tempProbability;
-                unset($tempProbability);
-            }
-            $prizeProbability = array_combine(range(1, sizeof($prizeProbability)), array_values($prizeProbability));
-
-            $longerDecimalLength = 0;
-            foreach ($prizeProbability as $probability) {
-                $numberArray = explode('.', $probability);
-                $decimal     = (int)(isset($numberArray[1]) ? $numberArray[1] : 0);
-                if ($decimal != 0 && strlen($decimal) > $longerDecimalLength) {
-                    $longerDecimalLength = strlen($decimal);
-                }
-            }
-            $product = pow(10, $longerDecimalLength);
-            foreach ($prizeProbability as $prizeId => $probability) {
-                $prizeProbability[$prizeId] = (int)($probability * $product);
-            }
-            $this->prizeProbability = $prizeProbability;
-            $this->createPrizeProbabilitySection();
-        } else {
-            $this->prizeProbability = [];
-            $this->createPrizeProbabilitySection();
+        if (empty($prizeList)) {
+            return [];
         }
-        return $this;
+        $prizeTypeList = [];
+        foreach ($prizeList as $key => $prize) {
+            if ($prize instanceof Prize) {
+                if (empty($prize->prizeType)
+                    || $prize->prizeDefaultProbability === 0
+                    || $prize->prizeCount === 0
+                    || $prize->prizeUserCount === 0) {
+                    unset($prizeList[$key]);
+                    continue;
+                }
+                if ($prize->prizeCount !== null && $prize->prizeCountFunction !== null) {
+                    $tempCount = call_user_func_array($prize->prizeCountFunction, [$prize->prizeType]);
+                    if (!is_numeric($tempCount) || $tempCount < 0 || $tempCount >= $prize->prizeCount) {
+                        unset($prizeList[$key]);
+                        continue;
+                    }
+                }
+                if ($prize->prizeUserCount !== null && $prize->prizeUserCount !== null) {
+                    $tempCount = call_user_func_array($prize->prizeUserCountFunction, [$prize->prizeUserCount]);
+                    if (!is_numeric($tempCount) || $tempCount < 0 || $tempCount >= $prize->prizeUserCount) {
+                        unset($prizeList[$key]);
+                        continue;
+                    }
+                }
+                $prizeTypeList[$prize->prizeType][] = $key;
+            } else {
+                unset($prizeList[$key]);
+            }
+        }
+        $index = 0;
+        foreach ($prizeTypeList as $prizeTypeArray) {
+            if (sizeof($prizeTypeArray) > 1) {
+                $index = 0;
+                foreach ($prizeTypeArray as $prizeKey) {
+                    if ($index > 0) {
+                        unset($prizeList[$prizeKey]);
+                    }
+                    $index++;
+                }
+            }
+        }
+        $prizeList = array_values($prizeList);
+        return $prizeList;
     }
 
     /**
-     * 根据奖品概率设置
+     * 开始抽奖
+     *
+     * @param $prizeInstanceList
+     * @param $redisInstance
+     * @param string $errorMessage
+     * @return bool|null
      */
-    private function createPrizeProbabilitySection()
+    public function startToGetAPrize($prizeInstanceList, $redisInstance, &$errorMessage = "")
     {
-        if (empty($this->prizeProbability)) {
-            $this->prizeProbbilitySection = [];
-        } else {
-            $section = [];
-            foreach ($this->prizeProbability as $prizeId => $probabiltiy) {
-                $section[$prizeId] = $probabiltiy + $this->prizeProbability[$prizeId - 1];
+        if ($redisInstance instanceof Redis) {
+            foreach ($prizeInstanceList as $prize) {
+                if (empty($prize->redisListKey)) {
+                    $errorMessage = "Prize {" . $prize->prizeType . "}'s redis key is empty";
+                    return false;
+                }
             }
-            $this->prizeProbbilitySection = $section;
-            $this->prizeMaxProbaility = end($section);
         }
-        return $this;
+        $probabilitySection = [];
+        $lastProbability    = 1;
+        $maxProbability     = 0;
+        foreach ($prizeInstanceList as $prizeInstance) {
+            $maxProbability       = $prizeInstance->prizeDefaultProbability + $lastProbability - 1;
+            $probabilitySection[] = [
+                $lastProbability,
+                $maxProbability,
+                $prizeInstance
+            ];
+            $lastProbability      += $prizeInstance->prizeDefaultProbability;
+        }
+
+        unset($prizeInstanceList);
+        $prize = false;
+        if ($redisInstance instanceof Redis) {
+            while (true) {
+                try {
+                    $prizeInstance = null;
+                    $prizeKey      = null;
+                    $tempRand      = rand(1, $maxProbability);
+
+                    foreach ($probabilitySection as $key => $section) {
+                        if ($tempRand >= $section[0] && $tempRand <= $section[1]) {
+                            $prizeKey      = $key;
+                            $prizeInstance = $section[2];
+                            break;
+                        }
+                    }
+
+                    if ($prizeInstance !== null && $prizeKey !== null) {
+                        $redisClient = $redisInstance->createRedisClient();
+                        if ($redisClient === false) {
+                            $errorMessage = $redisInstance->errorMessage;
+                            break;
+                        }
+                        $tempPrizeUid = $redisClient->rpop($prizeInstance->redisListKey);
+                        $redisClient->quit();
+                        if ($tempPrizeUid === false || is_null($tempPrizeUid)) {
+                            unset($probabilitySection[$prizeKey]);
+                            $probabilitySection = array_values($probabilitySection);
+                        } else {
+                            $prizeInstance->prizeUid = $tempPrizeUid;
+                            $prize                   = $prizeInstance;
+                            break;
+                        }
+                    }
+                    if (empty($probabilitySection)) {
+                        $errorMessage = "Prize Empty";
+                        break;
+                    }
+                    $lastProbability = 1;
+                    foreach ($probabilitySection as $key => $section) {
+                        $maxProbability              = $section[2]->prizeDefaultProbability + $lastProbability - 1;
+                        $probabilitySection[$key][0] = $lastProbability;
+                        $probabilitySection[$key][1] = $maxProbability;
+                        $lastProbability             += $section[2]->prizeDefaultProbability;
+                    }
+                } catch (\Exception $exception) {
+                    $errorMessage = $exception->getMessage();
+                    break;
+                }
+            }
+        } else {
+            $rand = rand(1, $maxProbability);
+            foreach ($probabilitySection as $prizeType => $section) {
+                if ($rand >= $section[0] && $rand <= $section[1]) {
+                    $prize = $section[2];
+                    break;
+                }
+            }
+        }
+        return $prize;
+    }
+
+    /**
+     *
+     * @param $prizePoolRedisKey
+     * @param $redisInstance
+     * @return bool
+     */
+    public function pickAPrizeFromPool($prizePoolRedisKey, $redisInstance, &$errorMessage)
+    {
+        $luaString = '
+            local llen = redis.call("llen",KEYS[1]);
+            if llen <= 0
+            then
+                return false;
+            end
+            math.randomseed(ARGV[1])
+            local index = math.random(llen) - 1;
+            local value = redis.call("lindex",KEYS[1],index);
+            if value ~= nil
+            then
+              redis.call("lrem",KEYS[1],index,value);
+            end
+            return value;  
+        ';
+        $prizeUid  = false;
+        if ($redisInstance instanceof Redis) {
+            $redisClient = $redisInstance->createRedisClient();
+            if ($redisClient === false) {
+                $errorMessage = $redisInstance->errorMessage;
+            } else {
+                $result = $redisClient->eval($luaString, 1, $prizePoolRedisKey, rand(0, 99999999));
+                if ($result === null) {
+                    $errorMessage = "Prize pool empty";
+                } else {
+                    $prizeUid = $result;
+                }
+            }
+        }
+        return $prizeUid;
     }
 }

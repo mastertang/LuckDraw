@@ -1,21 +1,30 @@
 {
-  "name":             "mastertang/luckdraw",
+  "name": "mastertang/luckdraw",
   "description": "抽奖模块",
-  "keywords":         ["luckdraw","lottery","prize","PHP" ,"php"],
-  "time":             "2017-10-09",
-  "license" : "MIT",
-  "autoload":{
-    "psr-4":{
-      "LuckDraw\\":"./"
+  "keywords": [
+    "luckdraw",
+    "lottery",
+    "prize",
+    "PHP",
+    "php"
+  ],
+  "time": "2017-10-09",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "LuckDraw\\": "./"
     }
   },
-  "authors": [{
-    "name":         "RuiHua Tang",
-    "email":        "547740900@qq.com",
-    "homepage":     "https://github.com/",
-    "role":         "Programmer"
-  }],
-  "require":{
-        "php": ">=5.3.0"
-   }
+  "authors": [
+    {
+      "name": "RuiHua Tang",
+      "email": "547740900@qq.com",
+      "homepage": "https://github.com/",
+      "role": "Programmer"
+    }
+  ],
+  "require": {
+    "php": ">=5.3.0",
+    "predis/predis": "v1.1"
+  }
 }
